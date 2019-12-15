@@ -1,0 +1,19 @@
+{
+  "logger": {
+    "title": "Remote Sync"
+  },
+  "uploadOnSave": true,
+  "useAtomicWrites": false,
+  "deleteLocal": false,
+  "hostname": "52.136.228.87",
+  "ignore": [
+    ".remote-sync.json",
+    ".git/**"
+  ],
+  "watch": [],
+  "transport": "scp",
+  "port": "22",
+  "target": "/home/ben/ansible-demo-exercises",
+  "username": "ben",
+  "keyfile": "E:\\Udemy Courses\\azure_priv.pem"
+}

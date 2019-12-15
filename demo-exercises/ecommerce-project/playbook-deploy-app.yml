@@ -1,0 +1,114 @@
+---
+-
+  name: Install, start and enable firewall on all nodes
+  hosts: all
+  tasks:
+    - name: Make sure we have a 'wheel' group
+      group:
+        name: wheel
+        state: present
+
+    - name: Allow 'wheel' group to have passwordless sudo
+      become: yes
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^# %wheel'
+        line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+
+    - name: Add sudoers users to wheel group
+      become: yes
+      user:
+        name=ben
+        group=wheel
+        state=present
+    -
+      name: Install firewalld and systemd
+      yum:
+        name: firewalld, systemd
+        state: present
+    -
+      name: Start firewalld service
+      service: name=firewalld state=started
+  #  -
+  #    name: Enable firewall service
+  #    systemd: name=firewalld enabled=yes
+-
+  name: Install and configure db softwares
+  hosts: db_node
+  tasks:
+    - name: Install mariadb server
+      become: yes
+      yum:
+        name: mariadb-server, python2, python3,MySQL-python
+        state: present
+    - name: Start mariadb service
+      #shell: service mariadb start
+  #  - name: Enable mariadb service
+      service: name=mariadb state=started
+    - name: Open firewall ports
+      become: yes
+      firewalld:
+        zone: public
+        port: 3306/udp
+        permanent: yes
+        state: enabled
+    - name: Create and configure ecomdb 1
+      become: yes
+      mysql_db:
+        name: ecomdb
+        state: present
+    - name: Create and configure ecomdb 2
+      become: yes
+      mysql_user:
+        name: ecomuser
+        password: ecompassword
+        priv: '*.*:ALL'
+        state: present
+    - name: Load db data 1
+      become: yes
+      copy:
+        src: /home/ben/ansible-demo-exercises/ecommerce-project/assets/db-load-script.sql
+        dest: /tmp/db-load-script.sql
+        mode: '0700'
+    - name: check if data exists
+      become: yes
+      command: sudo mysql ecomdb -e 'SELECT table_name FROM information_schema.tables;'
+      register: result
+    - name: Load db data 2
+      become: yes
+      shell: mysql ecomdb < /tmp/db-load-script.sql
+      when: result.stdout.find('products') == -1
+-
+  name: Install Web application softwares
+  hosts: web_node
+  tasks:
+    - name: Install softwares
+      become: yes
+      yum:
+        name: httpd, php, php-mysql, git
+        state: present
+  #  - name: Enable services
+  #    service: name=httpd enabled=yes
+    - name: Open firewall ports
+      become: yes
+      firewalld:
+        zone: public
+        port: 80/udp
+        permanent: yes
+        state: enabled
+    - name: Replace index.html with index.php
+      become: yes
+      lineinfile:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: '^    DirectoryIndex index.html'
+        line: '    DirectoryIndex index.php'
+
+    - name: Start services
+      become: yes
+      service: name=httpd state=started
+    - name: Clone git
+      become: yes
+      git:
+        repo: https://github.com/kodekloudhub/learning-app-ecommerce.git
+        dest: /var/www/html/
